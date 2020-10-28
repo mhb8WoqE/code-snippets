@@ -34,6 +34,12 @@ public class Inject {
          * @return true if field should be created.
          */
         public boolean create() default false;
+
+        /**
+         * Explicitly specifies field descriptor.
+         * @return field descriptor
+         */
+        public String type() default "";
     }
 
     /**
@@ -145,7 +151,7 @@ public class Inject {
                     if (method.getReturnType() == void.class)
                         throw new IllegalArgumentException("Getter returns void " + method + " in " + inter);
 
-                    fieldDesc = getDescriptorForClass(method.getReturnType());
+                    fieldDesc = accessAnn.type().isEmpty() ? getDescriptorForClass(method.getReturnType()) : accessAnn.type();
                     final org.objectweb.asm.MethodVisitor mv = classNode.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC, method.getName(), "()" + fieldDesc, null, null);
                     mv.visitVarInsn(org.objectweb.asm.Opcodes.ALOAD, 0);
                     mv.visitFieldInsn(org.objectweb.asm.Opcodes.GETFIELD, fieldOwner, fieldName, fieldDesc);
@@ -162,7 +168,7 @@ public class Inject {
                 else if (method.getParameterCount() == 1) { // setter
                     if (method.getReturnType() != void.class)
                         throw new IllegalArgumentException("Setter must return void! Cause: " + method + " at " + inter);
-                    fieldDesc = getDescriptorForClass(method.getParameterTypes()[0]);
+                    fieldDesc = accessAnn.type().isEmpty() ? getDescriptorForClass(method.getParameterTypes()[0]) : accessAnn.type();
                     final org.objectweb.asm.MethodVisitor mv = classNode.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC, method.getName(), "(" + fieldDesc + ")V", null, null);
                     mv.visitVarInsn(org.objectweb.asm.Opcodes.ALOAD, 0);
                     switch (fieldDesc.charAt(0)) {
