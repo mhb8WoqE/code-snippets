@@ -12,6 +12,10 @@ public class Tests {
     byte[] privateFinalFieldsClass;
     byte[] noneFieldsPresentClass;
     byte[] methodsClass;
+    byte[] redirectsClass;
+
+    public static void main(String[] args) {
+    }
 
     @Before
     public void setup() throws IOException {
@@ -19,6 +23,37 @@ public class Tests {
         privateFinalFieldsClass = write(read("Tests$PrivateFinalFields"));
         noneFieldsPresentClass = write(read("Tests$NoneFieldsPresent"));
         methodsClass = write(read("Tests$Methods"));
+        redirectsClass = write(read("Tests$Redirects"));
+    }
+
+    @Test
+    public void testRedirects() throws IllegalAccessException, InstantiationException {
+        final ClassNode classNode = read(redirectsClass);
+
+        Inject.inject(classNode, IRedirects.class);
+
+        final Class<?> aClass = defineClass(write(classNode));
+        final IRedirects o = (IRedirects) aClass.newInstance();
+        System.out.println(o.methodRedirect(1, (short) 2, '3', (byte) 4, false, 5F, 6L, 7D, "hi"));
+        System.out.println(o.staticMethodRedirect(1, (short) 2, '3', (byte) 4, false, 5F, 6L, 7D, "hi"));
+    }
+
+    public static interface IRedirects {
+        @Inject.Redirect("method")
+        Object methodRedirect(int a, short s, char c, byte b, boolean z, float f, long l, double d, String o);
+
+        @Inject.Redirect(value = "staticMethod", callType = Inject.Redirect.Type.STATIC)
+        Object staticMethodRedirect(int a, short s, char c, byte b, boolean z, float f, long l, double d, String o);
+    }
+
+    public static class Redirects {
+        public Object method(int a, short s, char c, byte b, boolean z, float f, long l, double d, String o) {
+            return "method";
+        }
+
+        public static Object staticMethod(int a, short s, char c, byte b, boolean z, float f, long l, double d, String o) {
+            return "static method";
+        }
     }
 
     @Test
@@ -312,7 +347,7 @@ public class Tests {
     public static class Inheritor extends PrivateFields {}
 
     public static class PrivateFields {
-        private int anInt;
+        private int anInt = 1231243432;
         private byte aByte;
         private char aChar;
         private short aShort;
