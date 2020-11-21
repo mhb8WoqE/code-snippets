@@ -194,6 +194,12 @@ public class Pak {
                 cache.put(type, cached);
         }
 
+        if (cached == null)
+            cached = new PacketProcessor<T>() {
+                @Override public void write(T t, ByteBuf buffer) {}
+                @Override public void read(T t, ByteBuf buffer) {}
+            };
+
         return cached;
     }
 
