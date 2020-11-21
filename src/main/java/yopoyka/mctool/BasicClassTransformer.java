@@ -1,3 +1,5 @@
+package yopoyka.mctool;
+
 public class BasicClassTransformer {
     /*
     protected java.util.Map<String, net.minecraft.launchwrapper.IClassTransformer> transformers = new java.util.HashMap<>();

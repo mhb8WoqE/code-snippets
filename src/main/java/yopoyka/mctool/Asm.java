@@ -1,3 +1,5 @@
+package yopoyka.mctool;
+
 public class Asm {
     public static org.objectweb.asm.tree.ClassNode read(byte[] bytes) {
         org.objectweb.asm.ClassReader cr = new org.objectweb.asm.ClassReader(bytes);

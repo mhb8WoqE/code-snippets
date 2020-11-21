@@ -2,3 +2,7 @@
 .idea
 build
 out
+.settings
+.project
+.classpath
+bin

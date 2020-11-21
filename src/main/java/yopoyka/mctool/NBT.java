@@ -1,3 +1,5 @@
+package yopoyka.mctool;
+
 import net.minecraft.nbt.NBTBase;
 import net.minecraft.nbt.NBTTagCompound;
 

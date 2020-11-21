@@ -1,45 +1,9 @@
+package yopoyka.mctool;
+
 public class Inject {
-    public static interface IMcp {
-        public String fromSrg(String srgName);
+    public static final Inject instance = new Inject();
+    public IMcp mcp = new LegacyMcp();
 
-        public String fromSrgMethod(String srgName);
-
-        public String fromSrgField(String srgName);
-    }
-
-    public static class LegacyMcp implements IMcp {
-        protected String fields;
-        protected String methods;
-        protected java.io.File fieldsFile;
-        protected java.io.File methodsFile;
-        {
-            try {
-                final Class<?> gradle = Class.forName("net.minecraftforge.gradle.GradleStartCommon", false, null);
-                final java.lang.reflect.Field csv_dir = gradle.getDeclaredField("CSV_DIR");
-                csv_dir.setAccessible(true);
-                final java.io.File csvDir = (java.io.File) csv_dir.get(null);
-                fieldsFile = csvDir.toPath().resolve("fields.csv").toFile();
-            } catch (ClassNotFoundException | NoSuchFieldException | IllegalAccessException e) {
-                System.err.println("GradleStartCommon is not loaded!");
-                e.printStackTrace();
-            }
-        }
-
-        @Override
-        public String fromSrg(String srgName) {
-            return null;
-        }
-
-        @Override
-        public String fromSrgMethod(String srgName) {
-            return null;
-        }
-
-        @Override
-        public String fromSrgField(String srgName) {
-            return null;
-        }
-    }
 
     @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.RUNTIME)
     public static @interface SrgName {
@@ -140,10 +104,6 @@ public class Inject {
         public Type callType() default Type.VIRTUAL;
     }
 
-    public static void inject(org.objectweb.asm.tree.ClassNode classNode, Class<?> inter) {
-        inject(classNode, inter, false);
-    }
-
     /**
      * Accepts a ClassNode and Class of interface which will be used as a model
      * to make modifications to ClassNode.
@@ -196,7 +156,7 @@ public class Inject {
      * @param inter the model according to which the class will be modified.
      *              Target class will be implementing the interface.
      */
-    public static void inject(org.objectweb.asm.tree.ClassNode classNode, Class<?> inter, boolean ignoreMcp) {
+    public void inject(org.objectweb.asm.tree.ClassNode classNode, Class<?> inter) {
         final Owner classAnnotation = inter.getAnnotation(Owner.class);
         final String owner = getOwnerOrDefault(classAnnotation, classNode.name);
 
@@ -217,7 +177,7 @@ public class Inject {
         }
     }
 
-    private static boolean doPublic(java.lang.reflect.Method method, org.objectweb.asm.tree.ClassNode classNode, String classOwner, String methodOwner, Class<?> inter) {
+    private boolean doPublic(java.lang.reflect.Method method, org.objectweb.asm.tree.ClassNode classNode, String classOwner, String methodOwner, Class<?> inter) {
         final Public publicAnn = method.getAnnotation(Public.class);
         if (publicAnn != null) {
             final String desc = getMethodDescriptor(method);
@@ -231,20 +191,30 @@ public class Inject {
         return false;
     }
 
-    private static boolean doAccess(java.lang.reflect.Method method, org.objectweb.asm.tree.ClassNode classNode, String classOwner, String methodOwner, Class<?> inter) {
+    private String getMappedName(SrgName ann) {
+        if (ann == null || mcp == null) return null;
+
+        return mcp.fromSrg(ann.value());
+    }
+
+    private boolean doAccess(java.lang.reflect.Method method, org.objectweb.asm.tree.ClassNode classNode, String classOwner, String methodOwner, Class<?> inter) {
         final Access accessAnn = method.getAnnotation(Access.class);
         if (accessAnn != null) {
             final String fieldOwner = methodOwner == null ? classOwner : methodOwner;
 
-            final String fieldName;
+            String fname = getMappedName(method.getAnnotation(SrgName.class));
 
-            if (accessAnn.value().isEmpty()) {
-                if (method.getName().length() < 4)
-                    throw new IllegalArgumentException("Accessor name must start with `get` or `set` got " + method.getName() + " in " + inter);
-                fieldName = (Character.toLowerCase(method.getName().charAt(3)) + method.getName().substring(4));
+            if (fname == null) {
+                if (accessAnn.value().isEmpty()) {
+                    if (method.getName().length() < 4)
+                        throw new IllegalArgumentException("Accessor name must start with `get` or `set` got " + method.getName() + " in " + inter);
+                    fname = (Character.toLowerCase(method.getName().charAt(3)) + method.getName().substring(4));
+                }
+                else
+                    fname = accessAnn.value();
             }
-            else
-                fieldName = accessAnn.value();
+
+            final String fieldName = fname;
 
             final String fieldDesc;
 
@@ -303,7 +273,7 @@ public class Inject {
         return false;
     }
 
-    private static boolean doRedirect(java.lang.reflect.Method method, org.objectweb.asm.tree.ClassNode classNode, String classOwner, String methodOwner, Class<?> inter) {
+    private boolean doRedirect(java.lang.reflect.Method method, org.objectweb.asm.tree.ClassNode classNode, String classOwner, String methodOwner, Class<?> inter) {
         final Redirect redirect = method.getAnnotation(Redirect.class);
         if (redirect != null) {
             final String methodDescriptor = getMethodDescriptor(method);
@@ -335,10 +305,13 @@ public class Inject {
             }
             final String returnType = redirect.returnType().isEmpty() ? getDescriptorForClass(method.getReturnType()) : redirect.returnType();
             final String desc = (redirect.desc().isEmpty() ? methodDescriptor.substring(0, methodDescriptor.indexOf(')') + 1) : "(" + redirect.desc() + ")") + returnType;
+            String methodName = getMappedName(method.getAnnotation(SrgName.class));
+            if (methodName == null)
+                methodName = redirect.value();
             mv.visitMethodInsn(
                     redirect.callType().opcode,
                     methodOwner == null ? classOwner : methodOwner,
-                    redirect.value(),
+                    methodName,
                     desc,
                     redirect.callType().isInterface()
             );
@@ -404,5 +377,77 @@ public class Inject {
             s.append(getDescriptorForClass(c));
         s.append(')').append(getDescriptorForClass(m.getReturnType()));
         return s.toString();
+    }
+
+    public static interface IMcp {
+        public String fromSrg(String srgName);
+
+        public String fromSrgMethod(String srgName);
+
+        public String fromSrgField(String srgName);
+    }
+
+    public static abstract class GradleMcp implements IMcp {
+        protected java.io.File fieldsFile;
+        protected java.io.File methodsFile;
+
+        {
+            try {
+                final Class<?> gradle = Class.forName("net.minecraftforge.gradle.GradleStartCommon", false, null);
+                final java.lang.reflect.Field csv_dir = gradle.getDeclaredField("CSV_DIR");
+                csv_dir.setAccessible(true);
+                final java.io.File csvDir = (java.io.File) csv_dir.get(null);
+                fieldsFile = csvDir.toPath().resolve("fields.csv").toFile();
+                methodsFile = csvDir.toPath().resolve("methods.csv").toFile();
+            } catch (ClassNotFoundException | NoSuchFieldException | IllegalAccessException e) {
+                System.err.println("GradleStartCommon is not loaded!");
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public static class LegacyMcp extends GradleMcp {
+        protected java.util.Map<String, String> fieldMap;
+        protected java.util.Map<String, String> methodMap;
+
+        @Override
+        public String fromSrg(String srgName) {
+            if (srgName.startsWith("field"))
+                return fromSrgField(srgName);
+            if (srgName.startsWith("func"))
+                return fromSrgMethod(srgName);
+            return srgName;
+        }
+
+        @Override
+        public String fromSrgMethod(String srgName) {
+            if (methodMap == null)
+                methodMap = readLines(methodsFile);
+
+            return methodMap.getOrDefault(srgName, srgName);
+        }
+
+        @Override
+        public String fromSrgField(String srgName) {
+            if (fieldMap == null)
+                fieldMap = readLines(fieldsFile);
+
+            return fieldMap.getOrDefault(srgName, srgName);
+        }
+
+        private static java.util.Map<String, String> readLines(java.io.File file) {
+            try {
+                final java.util.Map<String, String> map = new java.util.HashMap<>();
+                final java.util.List<String> lines = java.nio.file.Files.readAllLines(file.toPath(), java.nio.charset.StandardCharsets.UTF_8);
+                lines.forEach(line -> {
+                    final String[] split = line.split(",", 3);
+                    map.put(split[0], split[1]);
+                });
+                return map;
+            } catch (java.io.IOException e) {
+                e.printStackTrace();
+                return java.util.Collections.emptyMap();
+            }
+        }
     }
 }

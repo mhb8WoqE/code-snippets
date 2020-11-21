@@ -1,3 +1,5 @@
+package yopoyka.mctool;
+
 public class ItemStacks {
     /*
     public static void decrStackInSlot(net.minecraft.inventory.IInventory inv, int slot, int amount) {

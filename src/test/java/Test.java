@@ -1,4 +1,6 @@
 import net.minecraft.nbt.NBTTagCompound;
+import yopoyka.mctool.NBT;
+import yopoyka.mctool.Pak;
 
 import java.lang.invoke.ConstantCallSite;
 import java.lang.invoke.MethodHandles;

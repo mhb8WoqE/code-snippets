@@ -1,11 +1,20 @@
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.CompositeByteBuf;
+import io.netty.buffer.UnpooledByteBufAllocator;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.tree.ClassNode;
+import yopoyka.mctool.Inject;
+import yopoyka.mctool.Pak;
 
-import java.io.IOException;
+import java.io.*;
+import java.util.Arrays;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.function.BiConsumer;
 
 public class Tests {
     byte[] privateFieldsClass;
@@ -19,18 +28,202 @@ public class Tests {
 
     @Before
     public void setup() throws IOException {
-        privateFieldsClass = write(read("Tests$PrivateFields"));
-        privateFinalFieldsClass = write(read("Tests$PrivateFinalFields"));
-        noneFieldsPresentClass = write(read("Tests$NoneFieldsPresent"));
-        methodsClass = write(read("Tests$Methods"));
-        redirectsClass = write(read("Tests$Redirects"));
+        privateFieldsClass = readClass("Tests$PrivateFields");
+        privateFinalFieldsClass = readClass("Tests$PrivateFinalFields");
+        noneFieldsPresentClass = readClass("Tests$NoneFieldsPresent");
+        methodsClass = readClass("Tests$Methods");
+        redirectsClass = readClass("Tests$Redirects");
+        Pak.instance = new Pak(true);
+    }
+
+    public static byte[] readClass(String name) {
+        try (InputStream is = ClassLoader.getSystemResourceAsStream(name.replace('.', '/').concat(".class"))) {
+            final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            int read;
+            final byte[] buff = new byte[Short.MAX_VALUE];
+            while ((read = is.read(buff)) > 0) {
+                buffer.write(buff, 0, read);
+            }
+            return buffer.toByteArray();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Test
+    public void test_packing_unpacking() {
+        final Pak.PacketProcessor<Message> processor = Pak.instance.get(Message.class);
+        final CompositeByteBuf buf = new CompositeByteBuf(new UnpooledByteBufAllocator(true), true, Integer.MAX_VALUE);
+        final Message outbound = new Message();
+        outbound.string = "Outbound!";
+        outbound.nested.hello = "nested string";
+        outbound.varLen = new byte[20];
+        final Message incoming = new Message();
+        processor.write(outbound, buf);
+        processor.read(incoming, buf);
+        test_nested_and_inherited();
+        Assert.assertEquals(outbound, incoming);
+    }
+
+    @Test
+    public void test_nested_and_inherited() {
+        final CompositeByteBuf buf = new CompositeByteBuf(new UnpooledByteBufAllocator(true), true, Integer.MAX_VALUE);
+        final Pak.PacketProcessor<MessageExtended> processor = Pak.instance.get(MessageExtended.class);
+        final MessageExtended outboundExt = new MessageExtended();
+        outboundExt.string = "Outbound!";
+        outboundExt.nested.hello = "nested string";
+        outboundExt.aString = "Other Value";
+        outboundExt.varLen = new byte[20];
+        final MessageExtended incomingExt = new MessageExtended();
+        processor.write(outboundExt, buf);
+        processor.read(incomingExt, buf);
+        Assert.assertEquals(outboundExt, incomingExt);
+    }
+
+    @Pak.Inherit
+    public static class MessageExtended extends Message {
+        @Pak.Expose
+        public String aString = "Some Value";
+
+        @Override
+        public String toString() {
+            return "MessageExtended{" +
+                    "aString='" + aString + '\'' +
+                    ", anInt=" + anInt +
+                    ", aByte=" + aByte +
+                    ", aChar=" + aChar +
+                    ", aShort=" + aShort +
+                    ", aFloat=" + aFloat +
+                    ", aDouble=" + aDouble +
+                    ", aLong=" + aLong +
+                    ", aBoolean=" + aBoolean +
+                    ", string='" + string + '\'' +
+                    ", uuid=" + uuid +
+                    ", nested=" + nested +
+                    '}';
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            if (!super.equals(o)) return false;
+            MessageExtended that = (MessageExtended) o;
+            return Objects.equals(aString, that.aString);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(super.hashCode(), aString);
+        }
+    }
+
+    public static class Message {
+        @Pak.Expose
+        protected int anInt;
+        @Pak.Expose
+        protected byte aByte;
+        @Pak.Expose
+        protected char aChar;
+        @Pak.Expose
+        protected short aShort;
+        @Pak.Expose
+        protected float aFloat;
+        @Pak.Expose
+        protected double aDouble;
+        @Pak.Expose
+        protected long aLong;
+        @Pak.Expose
+        protected boolean aBoolean;
+        @Pak.Expose
+        protected String string = "a string!";
+        @Pak.Expose
+        protected UUID uuid = UUID.randomUUID();
+        @Pak.Expose
+        protected byte[] varLen;
+        @Pak.Expose
+        @Pak.Custom(Pak.ConstLenByteArr.class)
+        protected byte[] constLen = new byte[256];
+        @Pak.Expose
+        protected MessageNested nested = new MessageNested();
+
+        @Override
+        public String toString() {
+            return "Message{" +
+                    "anInt=" + anInt +
+                    ", aByte=" + aByte +
+                    ", aChar=" + aChar +
+                    ", aShort=" + aShort +
+                    ", aFloat=" + aFloat +
+                    ", aDouble=" + aDouble +
+                    ", aLong=" + aLong +
+                    ", aBoolean=" + aBoolean +
+                    ", string='" + string + '\'' +
+                    ", uuid=" + uuid +
+                    ", nested=" + nested +
+                    '}';
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            Message message = (Message) o;
+            return anInt == message.anInt &&
+                    aByte == message.aByte &&
+                    aChar == message.aChar &&
+                    aShort == message.aShort &&
+                    Float.compare(message.aFloat, aFloat) == 0 &&
+                    Double.compare(message.aDouble, aDouble) == 0 &&
+                    aLong == message.aLong &&
+                    aBoolean == message.aBoolean &&
+                    Objects.equals(string, message.string) &&
+                    Objects.equals(uuid, message.uuid) &&
+                    Arrays.equals(varLen, message.varLen) &&
+                    Arrays.equals(constLen, message.constLen) &&
+                    Objects.equals(nested, message.nested);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = Objects.hash(anInt, aByte, aChar, aShort, aFloat, aDouble, aLong, aBoolean, string, uuid, nested);
+            result = 31 * result + Arrays.hashCode(varLen);
+            result = 31 * result + Arrays.hashCode(constLen);
+            return result;
+        }
+    }
+
+    @Pak.Expose
+    public static class MessageNested {
+        @Pak.Expose
+        public String hello = "Hello!";
+
+        @Override
+        public String toString() {
+            return "MessageNested{" +
+                    "hello='" + hello + '\'' +
+                    '}';
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            MessageNested that = (MessageNested) o;
+            return Objects.equals(hello, that.hello);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(hello);
+        }
     }
 
     @Test
     public void testRedirects() throws IllegalAccessException, InstantiationException {
         final ClassNode classNode = read(redirectsClass);
 
-        Inject.inject(classNode, IRedirects.class);
+        Inject.instance.inject(classNode, IRedirects.class);
 
         final Class<?> aClass = defineClass(write(classNode));
         final IRedirects o = (IRedirects) aClass.newInstance();
@@ -64,13 +257,13 @@ public class Tests {
     @Test
     public void customNames() throws IllegalAccessException, InstantiationException {
         final ClassNode classNode = read(privateFieldsClass);
-        Inject.inject(classNode, CustomNames.class);
+        Inject.instance.inject(classNode, CustomNames.class);
         final Class<?> aClass = defineClass(write(classNode));
         final Object instance = aClass.newInstance();
         final CustomNames a = (CustomNames) instance;
-        Assert.assertEquals(a.getInt(), 0);
+        Assert.assertEquals(0, a.getInt());
         a.setInt(1);
-        Assert.assertEquals(a.getInt(), 1);
+        Assert.assertEquals(1, a.getInt());
     }
 
     @Test
@@ -120,43 +313,43 @@ public class Tests {
     }
 
     public static void test(ClassNode classNode, Class<?> model) throws IllegalAccessException, InstantiationException {
-        Inject.inject(classNode, model);
+        Inject.instance.inject(classNode, model);
         final Class<?> aClass = defineClass(write(classNode));
         final Object instance = aClass.newInstance();
         Accessors a = (Accessors) instance;
-        Assert.assertEquals(a.getAnInt(), 0);
-        Assert.assertEquals(a.getAByte(), 0);
-        Assert.assertEquals(a.getAChar(), 0);
-        Assert.assertEquals(a.getAShort(), 0);
-        Assert.assertEquals(a.getAFloat(), 0, 0);
-        Assert.assertEquals(a.getADouble(), 0, 0);
-        Assert.assertEquals(a.getALong(), 0);
+        Assert.assertEquals(0, a.getAnInt());
+        Assert.assertEquals(0, a.getAByte());
+        Assert.assertEquals(0, a.getAChar());
+        Assert.assertEquals(0, a.getAShort());
+        Assert.assertEquals(0, a.getAFloat(), 0);
+        Assert.assertEquals(0, a.getADouble(), 0);
+        Assert.assertEquals(0, a.getALong());
         Assert.assertFalse(a.getABoolean());
         Assert.assertNull(a.getString());
         a.setAnInt(1);
-        Assert.assertEquals(a.getAnInt(), 1);
+        Assert.assertEquals(1, a.getAnInt());
         a.setAByte((byte) 2);
-        Assert.assertEquals(a.getAByte(), 2);
+        Assert.assertEquals(2, a.getAByte());
         a.setAChar('c');
-        Assert.assertEquals(a.getAChar(), 'c');
+        Assert.assertEquals('c', a.getAChar());
         a.setAShort((short) 4);
-        Assert.assertEquals(a.getAShort(), 4);
+        Assert.assertEquals(4, a.getAShort());
         a.setAFloat(5);
-        Assert.assertEquals(a.getAFloat(), 5, 0);
+        Assert.assertEquals(5, a.getAFloat(), 0);
         a.setADouble(6);
-        Assert.assertEquals(a.getADouble(), 6, 0);
+        Assert.assertEquals(6, a.getADouble(), 0);
         a.setALong(7);
-        Assert.assertEquals(a.getALong(), 7);
+        Assert.assertEquals(7, a.getALong());
         a.setABoolean(true);
         Assert.assertTrue(a.getABoolean());
         a.setString("test");
-        Assert.assertEquals(a.getString(), "test");
+        Assert.assertEquals("test", a.getString());
     }
 
     @Test
     public void methods() throws IllegalAccessException, InstantiationException, ClassNotFoundException {
         final ClassNode classNode = read(methodsClass);
-        Inject.inject(classNode, IMethods.class);
+        Inject.instance.inject(classNode, IMethods.class);
         final Class<?> aClass = defineClass(write(classNode));
         final Object instance = aClass.newInstance();
         final IMethods methods = (IMethods) instance;
@@ -347,7 +540,7 @@ public class Tests {
     public static class Inheritor extends PrivateFields {}
 
     public static class PrivateFields {
-        private int anInt = 1231243432;
+        private int anInt;
         private byte aByte;
         private char aChar;
         private short aShort;
