@@ -1,4 +1,3 @@
-import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.UnpooledByteBufAllocator;
 import org.junit.Assert;
@@ -7,14 +6,13 @@ import org.junit.Test;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.tree.ClassNode;
-import yopoyka.mctool.Inject;
+import yopoyka.mctool.Injector;
 import yopoyka.mctool.Pak;
 
 import java.io.*;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.function.BiConsumer;
 
 public class Tests {
     byte[] privateFieldsClass;
@@ -223,7 +221,7 @@ public class Tests {
     public void testRedirects() throws IllegalAccessException, InstantiationException {
         final ClassNode classNode = read(redirectsClass);
 
-        Inject.instance.inject(classNode, IRedirects.class);
+        Injector.instance.inject(classNode, IRedirects.class);
 
         final Class<?> aClass = defineClass(write(classNode));
         final IRedirects o = (IRedirects) aClass.newInstance();
@@ -232,10 +230,10 @@ public class Tests {
     }
 
     public static interface IRedirects {
-        @Inject.Redirect("method")
+        @Injector.Redirect(to = "method")
         Object methodRedirect(int a, short s, char c, byte b, boolean z, float f, long l, double d, String o);
 
-        @Inject.Redirect(value = "staticMethod", callType = Inject.Redirect.Type.STATIC)
+        @Injector.Redirect(to = "staticMethod", callType = Injector.Redirect.Type.STATIC)
         Object staticMethodRedirect(int a, short s, char c, byte b, boolean z, float f, long l, double d, String o);
     }
 
@@ -257,7 +255,7 @@ public class Tests {
     @Test
     public void customNames() throws IllegalAccessException, InstantiationException {
         final ClassNode classNode = read(privateFieldsClass);
-        Inject.instance.inject(classNode, CustomNames.class);
+        Injector.instance.inject(classNode, CustomNames.class);
         final Class<?> aClass = defineClass(write(classNode));
         final Object instance = aClass.newInstance();
         final CustomNames a = (CustomNames) instance;
@@ -313,7 +311,7 @@ public class Tests {
     }
 
     public static void test(ClassNode classNode, Class<?> model) throws IllegalAccessException, InstantiationException {
-        Inject.instance.inject(classNode, model);
+        Injector.instance.inject(classNode, model);
         final Class<?> aClass = defineClass(write(classNode));
         final Object instance = aClass.newInstance();
         Accessors a = (Accessors) instance;
@@ -349,7 +347,7 @@ public class Tests {
     @Test
     public void methods() throws IllegalAccessException, InstantiationException, ClassNotFoundException {
         final ClassNode classNode = read(methodsClass);
-        Inject.instance.inject(classNode, IMethods.class);
+        Injector.instance.inject(classNode, IMethods.class);
         final Class<?> aClass = defineClass(write(classNode));
         final Object instance = aClass.newInstance();
         final IMethods methods = (IMethods) instance;
@@ -360,180 +358,180 @@ public class Tests {
 
     public static interface Accessors extends Getters, Setters {}
 
-    @Inject.Owner("Tests$PrivateFields")
+    @Injector.Owner("Tests$PrivateFields")
     public static interface InheritedAccessors extends Accessors {}
 
-    @Inject.Owner(clazz = PrivateFields.class)
+    @Injector.Owner(clazz = PrivateFields.class)
     public static interface InheritedAccessorsViaClass extends Accessors {}
 
     public static interface CustomNames {
-        @Inject.Access("anInt")
+        @Injector.AccessField("anInt")
         public int getInt();
 
-        @Inject.Access("anInt")
+        @Injector.AccessField("anInt")
         public void setInt(int value);
     }
 
     public static interface InvalidNames extends Accessors {
-        @Inject.Access
+        @Injector.AccessField
         public int get();
     }
 
     public static interface InvalidSetter extends Accessors {
-        @Inject.Access
+        @Injector.AccessField
         public int setI(int i);
     }
 
     public static interface InvalidGetter extends Accessors {
-        @Inject.Access
+        @Injector.AccessField
         public int getI(int i);
     }
 
     public static interface InvalidAccessor extends Accessors {
-        @Inject.Access
+        @Injector.AccessField
         public void setter(int a, boolean b);
     }
 
     public static interface CreateAccessors extends Accessors {
         @Override
-        @Inject.Access(create = true)
+        @Injector.AccessField(create = true)
         int getAnInt();
 
         @Override
-        @Inject.Access(create = true)
+        @Injector.AccessField(create = true)
         byte getAByte();
 
         @Override
-        @Inject.Access(create = true)
+        @Injector.AccessField(create = true)
         char getAChar();
 
         @Override
-        @Inject.Access(create = true)
+        @Injector.AccessField(create = true)
         short getAShort();
 
         @Override
-        @Inject.Access(create = true)
+        @Injector.AccessField(create = true)
         float getAFloat();
 
         @Override
-        @Inject.Access(create = true)
+        @Injector.AccessField(create = true)
         double getADouble();
 
         @Override
-        @Inject.Access(create = true)
+        @Injector.AccessField(create = true)
         long getALong();
 
         @Override
-        @Inject.Access(create = true)
+        @Injector.AccessField(create = true)
         boolean getABoolean();
 
         @Override
-        @Inject.Access(create = true)
+        @Injector.AccessField(create = true)
         String getString();
 
         @Override
-        @Inject.Access(create = true)
+        @Injector.AccessField(create = true)
         void setAnInt(int value);
 
         @Override
-        @Inject.Access(create = true)
+        @Injector.AccessField(create = true)
         void setAByte(byte value);
 
         @Override
-        @Inject.Access(create = true)
+        @Injector.AccessField(create = true)
         void setAChar(char value);
 
         @Override
-        @Inject.Access(create = true)
+        @Injector.AccessField(create = true)
         void setAShort(short value);
 
         @Override
-        @Inject.Access(create = true)
+        @Injector.AccessField(create = true)
         void setAFloat(float value);
 
         @Override
-        @Inject.Access(create = true)
+        @Injector.AccessField(create = true)
         void setADouble(double value);
 
         @Override
-        @Inject.Access(create = true)
+        @Injector.AccessField(create = true)
         void setALong(long value);
 
         @Override
-        @Inject.Access(create = true)
+        @Injector.AccessField(create = true)
         void setABoolean(boolean value);
 
         @Override
-        @Inject.Access(create = true)
+        @Injector.AccessField(create = true)
         void setString(String value);
     }
 
     public static interface Getters {
-        @Inject.Access
+        @Injector.AccessField
         public int getAnInt();
 
-        @Inject.Access
+        @Injector.AccessField
         public byte getAByte();
 
-        @Inject.Access
+        @Injector.AccessField
         public char getAChar();
 
-        @Inject.Access
+        @Injector.AccessField
         public short getAShort();
 
-        @Inject.Access
+        @Injector.AccessField
         public float getAFloat();
 
-        @Inject.Access
+        @Injector.AccessField
         public double getADouble();
 
-        @Inject.Access
+        @Injector.AccessField
         public long getALong();
 
-        @Inject.Access
+        @Injector.AccessField
         public boolean getABoolean();
 
-        @Inject.Access
+        @Injector.AccessField
         public String getString();
     }
 
     public static interface Setters {
-        @Inject.Access
+        @Injector.AccessField
         public void setAnInt(int value);
 
-        @Inject.Access
+        @Injector.AccessField
         public void setAByte(byte value);
 
-        @Inject.Access
+        @Injector.AccessField
         public void setAChar(char value);
 
-        @Inject.Access
+        @Injector.AccessField
         public void setAShort(short value);
 
-        @Inject.Access
+        @Injector.AccessField
         public void setAFloat(float value);
 
-        @Inject.Access
+        @Injector.AccessField
         public void setADouble(double value);
 
-        @Inject.Access
+        @Injector.AccessField
         public void setALong(long value);
 
-        @Inject.Access
+        @Injector.AccessField
         public void setABoolean(boolean value);
 
-        @Inject.Access
+        @Injector.AccessField
         public void setString(String value);
     }
 
     public static interface IMethods {
-        @Inject.Public
+        @Injector.Public
         public int getInt();
 
-        @Inject.Public
+        @Injector.Public
         public int getAnotherInt();
 
-        @Inject.Public
+        @Injector.Public
         public int getPublicInt();
     }
 
