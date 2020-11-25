@@ -72,6 +72,22 @@ public class Asm {
         }
     }
 
+    public static <T extends org.objectweb.asm.tree.AbstractInsnNode> void fromTop(org.objectweb.asm.tree.InsnList list, java.util.function.Predicate<org.objectweb.asm.tree.AbstractInsnNode> filter, java.util.function.BiConsumer<org.objectweb.asm.tree.InsnList, T> action) {
+        forEach(list.getFirst(), list, filter, action);
+    }
+
+    public static <T extends org.objectweb.asm.tree.AbstractInsnNode> void fromTop(org.objectweb.asm.tree.InsnList list, java.util.function.BiConsumer<org.objectweb.asm.tree.InsnList, T> action) {
+        forEach(list.getFirst(), list, alwaysTrue(), action);
+    }
+
+    public static <T extends org.objectweb.asm.tree.AbstractInsnNode> void fromBottom(org.objectweb.asm.tree.InsnList list, java.util.function.Predicate<org.objectweb.asm.tree.AbstractInsnNode> filter, java.util.function.BiConsumer<org.objectweb.asm.tree.InsnList, T> action) {
+        forEachBack(list.getLast(), list, filter, action);
+    }
+
+    public static <T extends org.objectweb.asm.tree.AbstractInsnNode> void fromBottom(org.objectweb.asm.tree.InsnList list, java.util.function.BiConsumer<org.objectweb.asm.tree.InsnList, T> action) {
+        forEachBack(list.getLast(), list, alwaysTrue(), action);
+    }
+
     public static <T extends org.objectweb.asm.tree.AbstractInsnNode> void forEach(org.objectweb.asm.tree.AbstractInsnNode from, org.objectweb.asm.tree.InsnList list, java.util.function.Predicate<org.objectweb.asm.tree.AbstractInsnNode> filter, java.util.function.BiConsumer<org.objectweb.asm.tree.InsnList, T> action) {
         org.objectweb.asm.tree.AbstractInsnNode node = from;
         while (node != null) {
@@ -92,6 +108,19 @@ public class Asm {
 
     public static java.util.function.Predicate<org.objectweb.asm.tree.AbstractInsnNode> opcode(int opcode) {
         return n -> n.getOpcode() == opcode;
+    }
+
+    public static java.util.function.Predicate<org.objectweb.asm.tree.AbstractInsnNode> opcodes(int opcodes) {
+        return n -> (n.getOpcode() & opcodes) != 0;
+    }
+
+    public static java.util.function.Predicate<org.objectweb.asm.tree.AbstractInsnNode> methodCall() {
+        return opcodes(
+                org.objectweb.asm.Opcodes.INVOKEVIRTUAL
+                | org.objectweb.asm.Opcodes.INVOKEINTERFACE
+                | org.objectweb.asm.Opcodes.INVOKESPECIAL
+                | org.objectweb.asm.Opcodes.INVOKESTATIC
+        );
     }
 
     public static java.util.function.Predicate<org.objectweb.asm.tree.AbstractInsnNode> type(String type) {
@@ -124,5 +153,210 @@ public class Asm {
 
     public static java.util.function.Predicate<org.objectweb.asm.tree.AbstractInsnNode> jump(org.objectweb.asm.Label label) {
         return m -> m instanceof org.objectweb.asm.tree.JumpInsnNode && label.equals(((org.objectweb.asm.tree.JumpInsnNode) m).label.getLabel());
+    }
+
+    public static java.util.function.Consumer<org.objectweb.asm.tree.InsnList> callMethod(int opcode, String owner, String name, String desc) {
+        return list -> list.add(new org.objectweb.asm.tree.MethodInsnNode(
+                opcode,
+                owner,
+                name,
+                desc,
+                opcode == org.objectweb.asm.Opcodes.INVOKEINTERFACE
+        ));
+    }
+
+    public static java.util.function.Consumer<org.objectweb.asm.tree.InsnList> accessField(int opcode, String owner, String name, String desc) {
+        return list -> list.add(new org.objectweb.asm.tree.FieldInsnNode(
+                opcode,
+                owner,
+                name,
+                desc
+        ));
+    }
+
+    public static java.util.function.Consumer<org.objectweb.asm.tree.InsnList> getStatic(String owner, String name, String desc) {
+        return accessField(org.objectweb.asm.Opcodes.GETSTATIC, owner, name, desc);
+    }
+
+    public static java.util.function.Consumer<org.objectweb.asm.tree.InsnList> putStatic(String owner, String name, String desc) {
+        return accessField(org.objectweb.asm.Opcodes.PUTSTATIC, owner, name, desc);
+    }
+
+    public static java.util.function.Consumer<org.objectweb.asm.tree.InsnList> getField(String owner, String name, String desc) {
+        return accessField(org.objectweb.asm.Opcodes.GETFIELD, owner, name, desc);
+    }
+
+    public static java.util.function.Consumer<org.objectweb.asm.tree.InsnList> setField(String owner, String name, String desc) {
+        return accessField(org.objectweb.asm.Opcodes.PUTFIELD, owner, name, desc);
+    }
+
+    public static java.util.function.Consumer<org.objectweb.asm.tree.InsnList> accessVar(int opcode, int index) {
+        return list -> list.add(new org.objectweb.asm.tree.VarInsnNode(opcode, index));
+    }
+
+    public static java.util.function.Consumer<org.objectweb.asm.tree.InsnList> getThis() {
+        return list -> list.add(new org.objectweb.asm.tree.VarInsnNode(org.objectweb.asm.Opcodes.ALOAD, 0));
+    }
+
+    public static java.util.function.Consumer<org.objectweb.asm.tree.InsnList> addInst(int opcode) {
+        return list -> list.add(new org.objectweb.asm.tree.InsnNode(opcode));
+    }
+
+    public static java.util.function.Consumer<org.objectweb.asm.tree.InsnList> addInst(java.util.function.Supplier<org.objectweb.asm.tree.AbstractInsnNode> inst) {
+        return list -> list.add(inst.get());
+    }
+
+    private static final java.util.function.Function<org.objectweb.asm.tree.MethodNode, org.objectweb.asm.tree.InsnList> TO_INSTRUCTIONS = methodNode -> methodNode.instructions;
+    public static java.util.function.Function<org.objectweb.asm.tree.MethodNode, org.objectweb.asm.tree.InsnList> toInstructions() {
+        return TO_INSTRUCTIONS;
+    }
+
+    private static final java.util.function.Predicate ALWAYS_TRUE = o -> true;
+    private static final java.util.function.Predicate ALWAYS_FALSE = o -> false;
+    public static <T> java.util.function.Predicate<T> alwaysTrue() {
+        return ALWAYS_TRUE;
+    }
+
+    public static <T> java.util.function.Predicate<T> alwaysFalse() {
+        return ALWAYS_FALSE;
+    }
+
+    private static final java.util.function.Consumer NOTHING = o -> {};
+    public static <T> java.util.function.Consumer<T> nothing() {
+        return NOTHING;
+    }
+
+    public static <T> java.util.function.Predicate<T> and(java.util.function.Predicate<T>... predicates) {
+        return t -> {
+            for (java.util.function.Predicate<T> predicate : predicates) {
+                if (!predicate.test(t))
+                    return false;
+            }
+            return true;
+        };
+    }
+
+    public static <T> java.util.function.Predicate<T> or(java.util.function.Predicate<T>... predicates) {
+        return t -> {
+            for (java.util.function.Predicate<T> predicate : predicates) {
+                if (predicate.test(t))
+                    return true;
+            }
+            return false;
+        };
+    }
+
+    public static <T> java.util.function.Consumer<T> compose(java.util.function.Consumer<T>... consumers) {
+        return t -> {
+            for (java.util.function.Consumer<T> consumer : consumers)
+                consumer.accept(t);
+        };
+    }
+
+    public static int addModifier(int original, int modifier) {
+        return original | modifier;
+    }
+
+    public static int removeModifier(int original, int modifier) {
+        return original & ~modifier;
+    }
+
+    public static int makePublic(int original) {
+        return removeModifier(original, org.objectweb.asm.Opcodes.ACC_PRIVATE & org.objectweb.asm.Opcodes.ACC_PROTECTED)
+                | org.objectweb.asm.Opcodes.ACC_PUBLIC;
+    }
+
+    public static <T extends org.objectweb.asm.tree.AbstractInsnNode> java.util.function.BiConsumer<org.objectweb.asm.tree.InsnList, T> insertBefore(java.util.function.Supplier<org.objectweb.asm.tree.InsnList> list) {
+        return (nodes, node) -> nodes.insertBefore(node, list.get());
+    }
+
+    public static <T extends org.objectweb.asm.tree.AbstractInsnNode> java.util.function.BiConsumer<org.objectweb.asm.tree.InsnList, T> insertAfter(java.util.function.Supplier<org.objectweb.asm.tree.InsnList> list) {
+        return (nodes, node) -> nodes.insert(node, list.get());
+    }
+
+    public static <T extends org.objectweb.asm.tree.AbstractInsnNode> java.util.function.BiConsumer<org.objectweb.asm.tree.InsnList, T> oneInsertBefore(java.util.function.Supplier<? extends org.objectweb.asm.tree.AbstractInsnNode> list) {
+        return (nodes, node) -> nodes.insertBefore(node, list.get());
+    }
+
+    public static <T extends org.objectweb.asm.tree.AbstractInsnNode> java.util.function.BiConsumer<org.objectweb.asm.tree.InsnList, T> oneInsertAfter(java.util.function.Supplier<? extends org.objectweb.asm.tree.AbstractInsnNode> list) {
+        return (nodes, node) -> nodes.insert(node, list.get());
+    }
+
+    public static org.objectweb.asm.tree.InsnList makeIf(
+            java.util.function.Consumer<org.objectweb.asm.tree.InsnList> setup,
+            java.util.function.Function<org.objectweb.asm.Label, org.objectweb.asm.tree.JumpInsnNode> jump,
+            java.util.function.Consumer<org.objectweb.asm.tree.InsnList> ifDidntJump,
+            java.util.function.Consumer<org.objectweb.asm.tree.InsnList> ifDidJump
+    ) {
+        org.objectweb.asm.tree.InsnList list = new org.objectweb.asm.tree.InsnList();
+        setup.accept(list);
+        org.objectweb.asm.Label jumpTo = new org.objectweb.asm.Label();
+        org.objectweb.asm.tree.JumpInsnNode jumpNode = jump.apply(jumpTo);
+        list.add(jumpNode);
+        ifDidntJump.accept(list);
+        list.add(new org.objectweb.asm.tree.LabelNode(jumpTo));
+        ifDidJump.accept(list);
+        return list;
+    }
+
+    public static java.util.function.Function<org.objectweb.asm.Label, org.objectweb.asm.tree.JumpInsnNode> makeJump(int opcode) {
+        return label -> new org.objectweb.asm.tree.JumpInsnNode(opcode, new org.objectweb.asm.tree.LabelNode(label));
+    }
+
+    public static java.util.function.Supplier<org.objectweb.asm.tree.InsnList> supplyIf(
+            java.util.function.Consumer<org.objectweb.asm.tree.InsnList> setup,
+            java.util.function.Function<org.objectweb.asm.Label, org.objectweb.asm.tree.JumpInsnNode> jump,
+            java.util.function.Consumer<org.objectweb.asm.tree.InsnList> ifDidntJump,
+            java.util.function.Consumer<org.objectweb.asm.tree.InsnList> ifDidJump
+    ) {
+        return () -> makeIf(setup, jump, ifDidntJump, ifDidJump);
+    }
+
+    public static org.objectweb.asm.tree.InsnList makeIf(
+            java.util.function.Supplier<org.objectweb.asm.tree.InsnList> setup,
+            java.util.function.Function<org.objectweb.asm.Label, org.objectweb.asm.tree.JumpInsnNode> jump,
+            java.util.function.Supplier<org.objectweb.asm.tree.InsnList> ifDidntJump,
+            java.util.function.Supplier<org.objectweb.asm.tree.InsnList> ifDidJump
+    ) {
+        org.objectweb.asm.tree.InsnList list = setup.get();
+        org.objectweb.asm.Label jumpTo = new org.objectweb.asm.Label();
+        org.objectweb.asm.tree.JumpInsnNode jumpNode = jump.apply(jumpTo);
+        list.add(jumpNode);
+        list.add(ifDidntJump.get());
+        list.add(new org.objectweb.asm.tree.LabelNode(jumpTo));
+        list.add(ifDidJump.get());
+        return list;
+    }
+
+    public static java.util.function.Supplier<org.objectweb.asm.tree.InsnList> supplyIf(
+            java.util.function.Supplier<org.objectweb.asm.tree.InsnList> setup,
+            java.util.function.Function<org.objectweb.asm.Label, org.objectweb.asm.tree.JumpInsnNode> jump,
+            java.util.function.Supplier<org.objectweb.asm.tree.InsnList> ifDidntJump,
+            java.util.function.Supplier<org.objectweb.asm.tree.InsnList> ifDidJump
+    ) {
+        return () -> makeIf(setup, jump, ifDidntJump, ifDidJump);
+    }
+
+    public static void addInterface(org.objectweb.asm.tree.ClassNode classNode, String inter) {
+        if (!classNode.interfaces.contains(inter))
+            classNode.interfaces.add(inter);
+    }
+
+    public static org.objectweb.asm.tree.MethodNode createMethod(int access, String name, String desc) {
+        return new org.objectweb.asm.tree.MethodNode(access, name, desc, null, null);
+    }
+
+    public static org.objectweb.asm.tree.MethodNode createMethod(String name, String desc) {
+        return new org.objectweb.asm.tree.MethodNode(org.objectweb.asm.Opcodes.ACC_PUBLIC, name, desc, null, null);
+    }
+
+    public static org.objectweb.asm.tree.MethodNode createMethod(String name) {
+        int i = name.indexOf('(');
+        return new org.objectweb.asm.tree.MethodNode(org.objectweb.asm.Opcodes.ACC_PUBLIC, name.substring(0, i), name.substring(i), null, null);
+    }
+
+    public static org.objectweb.asm.tree.MethodNode initMethodCode(org.objectweb.asm.tree.MethodNode method, java.util.function.Consumer<org.objectweb.asm.tree.InsnList> initializer) {
+        initializer.accept(method.instructions);
+        return method;
     }
 }

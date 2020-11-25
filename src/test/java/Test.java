@@ -1,10 +1,91 @@
-import org.objectweb.asm.tree.ClassNode;
+import jdk.internal.org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Label;
+import org.objectweb.asm.tree.*;
 import yopoyka.mctool.Injector;
 
 import java.util.Arrays;
+import java.util.function.Function;
+import java.util.function.Supplier;
+
+import static yopoyka.mctool.Asm.*;
 
 public class Test {
-    public static void main(String[] args) throws Throwable {
+    public static void main(String[] args) {
+        ClassNode classNode = null;
+
+        classNode.methods.add(initMethodCode(createMethod("getA", "()V"), compose(
+                getThis(),
+                getField("", "", ""),
+                addInst(Opcodes.ARETURN),
+        )));
+
+        classNode.methods
+            .stream()
+            .filter(forMethod(""))
+            .findFirst()
+            .ifPresent(methodNode -> {
+                fromTop(
+                    methodNode.instructions,
+                    and(
+                        methodCall(),
+                        methodOwner(""),
+                        methodDesc("")
+                    ),
+                    insertBefore(supplyIf(
+                        list -> {
+
+                        },
+                        makeJump(1),
+                            compose(
+                                    getThis(),
+                                    getField(null, null, null)
+                            ),
+                        nothing()
+                    ))
+                );
+            });
+    }
+
+    public static InsnList fullIf(Supplier<InsnList> setup,
+                           Function<Label, JumpInsnNode> jump,
+                           Supplier<InsnList> ifDidJump,
+                           Supplier<InsnList> ifDidntJump
+    ) {
+        InsnList setupList = setup.get();
+        Label jumpTo = new Label();
+        JumpInsnNode jumpNode = jump.apply(jumpTo);
+        setupList.add(ifDidntJump.get());
+        setupList.add(jumpNode);
+        setupList.add(ifDidJump.get());
+        return setupList;
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    public static void main_(String[] args) throws Throwable {
         final byte[] bytes = Tests.readClass("Test$AClass");
         final ClassNode classNode = Tests.read(bytes);
         Injector.instance.inject(classNode, Schema.class);
