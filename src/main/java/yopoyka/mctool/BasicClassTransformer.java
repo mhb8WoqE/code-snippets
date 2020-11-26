@@ -1,7 +1,8 @@
 package yopoyka.mctool;
 
-public class BasicClassTransformer {
-    /*
+import net.minecraft.launchwrapper.IClassTransformer;
+
+public class BasicClassTransformer implements IClassTransformer {
     protected java.util.Map<String, net.minecraft.launchwrapper.IClassTransformer> transformers = new java.util.HashMap<>();
 
     @Override
@@ -14,5 +15,4 @@ public class BasicClassTransformer {
 
         return basicClass;
     }
-     */
 }
