@@ -1,8 +1,10 @@
-import jdk.internal.org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.tree.*;
 import yopoyka.mctool.Injector;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Arrays;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -11,56 +13,25 @@ import static yopoyka.mctool.Asm.*;
 
 public class Test {
     public static void main(String[] args) {
-        ClassNode classNode = null;
-
-        classNode.methods.add(initMethodCode(createMethod("getA", "()V"), compose(
-                getThis(),
-                getField("", "", ""),
-                addInst(Opcodes.ARETURN),
-        )));
-
-        classNode.methods
-            .stream()
-            .filter(forMethod(""))
-            .findFirst()
-            .ifPresent(methodNode -> {
-                fromTop(
-                    methodNode.instructions,
-                    and(
-                        methodCall(),
-                        methodOwner(""),
-                        methodDesc("")
-                    ),
-                    insertBefore(supplyIf(
-                        list -> {
-
-                        },
-                        makeJump(1),
-                            compose(
-                                    getThis(),
-                                    getField(null, null, null)
-                            ),
-                        nothing()
-                    ))
-                );
-            });
-    }
-
-    public static InsnList fullIf(Supplier<InsnList> setup,
-                           Function<Label, JumpInsnNode> jump,
-                           Supplier<InsnList> ifDidJump,
-                           Supplier<InsnList> ifDidntJump
-    ) {
-        InsnList setupList = setup.get();
-        Label jumpTo = new Label();
-        JumpInsnNode jumpNode = jump.apply(jumpTo);
-        setupList.add(ifDidntJump.get());
-        setupList.add(jumpNode);
-        setupList.add(ifDidJump.get());
-        return setupList;
     }
 
 
+
+
+
+    public static byte[] readClass(String name) {
+        try (InputStream is = ClassLoader.getSystemResourceAsStream(name.replace('.', '/').concat(".class"))) {
+            final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            int read;
+            final byte[] buff = new byte[Short.MAX_VALUE];
+            while ((read = is.read(buff)) > 0) {
+                buffer.write(buff, 0, read);
+            }
+            return buffer.toByteArray();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
 
 

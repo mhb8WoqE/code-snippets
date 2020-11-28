@@ -1,5 +1,6 @@
 package yopoyka.mctool;
 
+import io.netty.buffer.ByteBuf;
 import net.minecraft.nbt.NBTBase;
 import net.minecraft.nbt.NBTTagCompound;
 
@@ -11,9 +12,12 @@ import java.lang.invoke.ConstantCallSite;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Field;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 public class NBT {
     @Retention(RetentionPolicy.RUNTIME)
@@ -28,6 +32,34 @@ public class NBT {
     @Target(ElementType.FIELD)
     public static @interface Name {
         public String value() default "";
+    }
+
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target(ElementType.TYPE)
+    public static @interface Inherit {}
+
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target({ElementType.FIELD, ElementType.TYPE})
+    public static @interface CustomWriter {
+        public Class<? extends RawWriter<?, ?>> value();
+
+        public String instance() default "_yopoyka_nbt_writer";
+    }
+
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target({ElementType.FIELD, ElementType.TYPE})
+    public static @interface CustomReader {
+        public Class<? extends RawReader<?, ?>> value();
+
+        public String instance() default "_yopoyka_nbt_reader";
+    }
+
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target({ElementType.FIELD, ElementType.TYPE})
+    public static @interface Custom {
+        public Class<? extends RawReadWriter<?, ?>> value();
+
+        public String instance() default "_yopoyka_nbt_readwriter";
     }
 
     public static <T> Consumer<NBTTagCompound> boundSerializer(Class<T> schema, T bindTo) {
@@ -245,5 +277,52 @@ public class NBT {
         }
 
         return result;
+    }
+
+    protected final boolean doCaching = true;
+    protected Map<Class<?>, Pair<Function<?, ? extends NBTBase>, Function<? extends NBTBase, ?>>> cache = new HashMap<>();
+    protected Map<Class<?>, Pair<RawWriter<? extends NBTBase, ?>, RawReader<? extends NBTBase, ?>>> rawProcessors = new HashMap<>();
+
+    public <T, N extends NBTBase> Function<T, N> writer(Class<T> schema) {
+        final Pair<Function<?, ? extends NBTBase>, Function<? extends NBTBase, ?>> pair;
+
+        if (doCaching)
+            pair = cache.get(schema);
+
+        if (pair == null) {
+        }
+
+        return null;
+    }
+
+    public static interface RawReadWriter<N extends NBTBase, T> extends RawReader<N, T>, RawWriter<N, T> {}
+
+    public static interface RawWriter<N extends NBTBase, T> {
+        public N write(Field field, T t) throws IllegalAccessException;
+    }
+
+    public static interface RawReader<N extends NBTBase, T> {
+        public void read(Field field, T t, N n) throws IllegalAccessException;
+    }
+
+    protected static class Pair<A, B> {
+        protected A right;
+        protected B left;
+
+        public A getWriter() {
+            return right;
+        }
+
+        public void setWriter(A right) {
+            this.right = right;
+        }
+
+        public B getReader() {
+            return left;
+        }
+
+        public void setReader(B left) {
+            this.left = left;
+        }
     }
 }
