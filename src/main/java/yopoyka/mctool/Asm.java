@@ -159,6 +159,18 @@ public class Asm {
         return m -> m instanceof org.objectweb.asm.tree.JumpInsnNode && label.equals(((org.objectweb.asm.tree.JumpInsnNode) m).label.getLabel());
     }
 
+    public static java.util.function.Predicate<org.objectweb.asm.tree.AbstractInsnNode> fieldName(String name) {
+        return n -> n instanceof org.objectweb.asm.tree.FieldInsnNode && name.equals(((org.objectweb.asm.tree.FieldInsnNode) n).name);
+    }
+
+    public static java.util.function.Predicate<org.objectweb.asm.tree.AbstractInsnNode> fieldOwner(String owner) {
+        return n -> n instanceof org.objectweb.asm.tree.FieldInsnNode && owner.equals(((org.objectweb.asm.tree.FieldInsnNode) n).owner);
+    }
+
+    public static java.util.function.Predicate<org.objectweb.asm.tree.AbstractInsnNode> fieldDesc(String desc) {
+        return n -> n instanceof org.objectweb.asm.tree.FieldInsnNode && desc.equals(((org.objectweb.asm.tree.FieldInsnNode) n).desc);
+    }
+
     public static java.util.function.Consumer<org.objectweb.asm.tree.InsnList> callMethod(int opcode, String owner, String name, String desc) {
         return list -> list.add(new org.objectweb.asm.tree.MethodInsnNode(
                 opcode,
@@ -391,5 +403,97 @@ public class Asm {
     public static org.objectweb.asm.tree.MethodNode initMethodCode(org.objectweb.asm.tree.MethodNode method, java.util.function.Consumer<org.objectweb.asm.tree.InsnList> initializer) {
         initializer.accept(method.instructions);
         return method;
+    }
+
+    public static void ensureField(String name, String desc, org.objectweb.asm.tree.ClassNode classNode) {
+        if (classNode.fields
+                .stream()
+                .noneMatch(f -> name.equals(f.name) && desc.equals(f.desc))) {
+            createField(name, desc, classNode);
+        }
+    }
+
+    public static void createField(String name, String desc, org.objectweb.asm.tree.ClassNode classNode) {
+        classNode.fields.add(new org.objectweb.asm.tree.FieldNode(
+                org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                name,
+                desc,
+                null,
+                null
+        ));
+    }
+
+    public static void createAccessors(String fieldName, String fieldDesc, String baseName, boolean createField, boolean isStatic, org.objectweb.asm.tree.ClassNode classNode) {
+        createAccessors(fieldName, fieldDesc, classNode.name, createField, isStatic, "get" + baseName, "set" + baseName, classNode);
+    }
+
+    public static void createAccessors(String fieldName, String fieldDesc, String fieldOwner, boolean createField, boolean isStatic, String getterName, String setterName, org.objectweb.asm.tree.ClassNode classNode) {
+        if (createField)
+            ensureField(fieldName, fieldDesc, classNode);
+
+        createGetter(fieldName, fieldDesc, fieldOwner, getterName, isStatic, classNode);
+        createSetter(fieldName, fieldDesc, fieldOwner, getterName, isStatic, classNode);
+    }
+
+    public static void createGetter(String fieldName, String fieldDesc, String fieldOwner, String name, boolean isStatic, org.objectweb.asm.tree.ClassNode classNode) {
+        initMethodCode(createMethod(name, "()" + fieldDesc), compose(
+                list -> {
+                    if (!isStatic)
+                        getThis().accept(list);
+                },
+                getField(fieldOwner, fieldName, fieldDesc),
+                list -> {
+                    switch (fieldDesc.charAt(0)) {
+                        case '[':
+                        case 'L':
+                            addInst(org.objectweb.asm.Opcodes.ARETURN).accept(list);
+                            break;
+                        case 'F':
+                            addInst(org.objectweb.asm.Opcodes.FRETURN).accept(list);
+                            break;
+                        case 'D':
+                            addInst(org.objectweb.asm.Opcodes.DRETURN).accept(list);
+                            break;
+                        case 'J':
+                            addInst(org.objectweb.asm.Opcodes.LRETURN).accept(list);
+                            break;
+                        default:
+                            addInst(org.objectweb.asm.Opcodes.IRETURN).accept(list);
+                            break;
+                    }
+                }
+        ));
+    }
+
+    public static void createSetter(String fieldName, String fieldDesc, String fieldOwner, String name, boolean isStatic, org.objectweb.asm.tree.ClassNode classNode) {
+        final int varIndex = isStatic ? 0 : 1;
+        initMethodCode(createMethod(name, '(' + fieldDesc + ")V"), compose(
+                list -> {
+                    if (!isStatic)
+                        getThis().accept(list);
+                },
+                list -> {
+                    switch (fieldDesc.charAt(0)) {
+                        case '[':
+                        case 'L':
+                            accessVar(org.objectweb.asm.Opcodes.ALOAD, varIndex).accept(list);
+                            break;
+                        case 'F':
+                            accessVar(org.objectweb.asm.Opcodes.FLOAD, varIndex).accept(list);
+                            break;
+                        case 'D':
+                            accessVar(org.objectweb.asm.Opcodes.DLOAD, varIndex).accept(list);
+                            break;
+                        case 'J':
+                            accessVar(org.objectweb.asm.Opcodes.LLOAD, varIndex).accept(list);
+                            break;
+                        default:
+                            accessVar(org.objectweb.asm.Opcodes.ILOAD, varIndex).accept(list);
+                            break;
+                    }
+                },
+                setField(fieldOwner, fieldName, fieldDesc),
+                addInst(org.objectweb.asm.Opcodes.RETURN)
+        ));
     }
 }
