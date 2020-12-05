@@ -369,6 +369,10 @@ public class Asm {
             classNode.interfaces.add(inter);
     }
 
+    public static void addInterfaces(org.objectweb.asm.tree.ClassNode classNode, java.lang.Iterable<String> interfaces) {
+        interfaces.forEach(s -> addInterface(classNode, s));
+    }
+
     public static void insertFirst(org.objectweb.asm.tree.InsnList list, org.objectweb.asm.tree.InsnList insert) {
         list.insertBefore(list.getFirst(), insert);
     }
@@ -495,5 +499,25 @@ public class Asm {
                 setField(fieldOwner, fieldName, fieldDesc),
                 addInst(org.objectweb.asm.Opcodes.RETURN)
         ));
+    }
+
+    public static void renameMethod(java.util.function.Predicate<org.objectweb.asm.tree.MethodNode> filter, String newName, boolean replace, org.objectweb.asm.tree.ClassNode classNode) {
+        classNode.methods
+                .stream()
+                .filter(filter)
+                .findFirst()
+                .ifPresent(methodNode -> {
+                    final java.util.Optional<org.objectweb.asm.tree.MethodNode> dup = classNode.methods
+                            .stream()
+                            .filter(forMethod(newName, methodNode.desc))
+                            .findFirst();
+                    if (dup.isPresent()) {
+                        if (replace)
+                            classNode.methods.remove(dup.get());
+                        else
+                            throw new RuntimeException("Found duplicate while renaming " + methodNode.name + methodNode.desc + " to " + newName);
+                    }
+                    methodNode.name = newName;
+                });
     }
 }
