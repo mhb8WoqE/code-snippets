@@ -18,29 +18,25 @@ public class Asm {
     }
 
     public static <T extends org.objectweb.asm.tree.AbstractInsnNode> T find(org.objectweb.asm.tree.InsnList list, java.util.function.Predicate<org.objectweb.asm.tree.AbstractInsnNode> filter) {
-        org.objectweb.asm.tree.AbstractInsnNode node = list.getFirst();
-        while (node != null) {
-            if (filter.test(node))
-                return (T) node;
-            node = node.getNext();
-        }
-        return null;
+        return find(list.getFirst(), filter);
     }
 
     public static <T extends org.objectweb.asm.tree.AbstractInsnNode> T find(org.objectweb.asm.tree.AbstractInsnNode node, java.util.function.Predicate<org.objectweb.asm.tree.AbstractInsnNode> filter) {
         while (node != null) {
-            if (filter.test(node))
-                return (T) node;
+            final org.objectweb.asm.tree.AbstractInsnNode target = node;
             node = node.getNext();
+            if (filter.test(target))
+                return (T) target;
         }
         return null;
     }
 
     public static <T extends org.objectweb.asm.tree.AbstractInsnNode> T findBack(org.objectweb.asm.tree.AbstractInsnNode node, java.util.function.Predicate<org.objectweb.asm.tree.AbstractInsnNode> filter) {
         while (node != null) {
-            if (filter.test(node))
-                return (T) node;
+            final org.objectweb.asm.tree.AbstractInsnNode target = node;
             node = node.getPrevious();
+            if (filter.test(target))
+                return (T) target;
         }
         return null;
     }
@@ -48,27 +44,30 @@ public class Asm {
     public static <T extends org.objectweb.asm.tree.AbstractInsnNode> void forEach(org.objectweb.asm.tree.InsnList list, java.util.function.Predicate<org.objectweb.asm.tree.AbstractInsnNode> filter, java.util.function.BiConsumer<org.objectweb.asm.tree.InsnList, T> action) {
         org.objectweb.asm.tree.AbstractInsnNode node = list.getFirst();
         while (node != null) {
-            if (filter.test(node))
-                action.accept(list, (T) node);
+            final org.objectweb.asm.tree.AbstractInsnNode target = node;
             node = node.getNext();
+            if (filter.test(target))
+                action.accept(list, (T) target);
         }
     }
 
     public static <T extends org.objectweb.asm.tree.AbstractInsnNode> void forEach(org.objectweb.asm.tree.AbstractInsnNode from, java.util.function.Predicate<org.objectweb.asm.tree.AbstractInsnNode> filter, java.util.function.Consumer<T> action) {
         org.objectweb.asm.tree.AbstractInsnNode node = from;
         while (node != null) {
-            if (filter.test(node))
-                action.accept((T) node);
+            final org.objectweb.asm.tree.AbstractInsnNode target = node;
             node = node.getNext();
+            if (filter.test(target))
+                action.accept((T) target);
         }
     }
 
     public static <T extends org.objectweb.asm.tree.AbstractInsnNode> void forEachBack(org.objectweb.asm.tree.AbstractInsnNode from, java.util.function.Predicate<org.objectweb.asm.tree.AbstractInsnNode> filter, java.util.function.Consumer<T> action) {
         org.objectweb.asm.tree.AbstractInsnNode node = from;
         while (node != null) {
-            if (filter.test(node))
-                action.accept((T) node);
+            final org.objectweb.asm.tree.AbstractInsnNode target = node;
             node = node.getPrevious();
+            if (filter.test(target))
+                action.accept((T) target);
         }
     }
 
@@ -91,18 +90,20 @@ public class Asm {
     public static <T extends org.objectweb.asm.tree.AbstractInsnNode> void forEach(org.objectweb.asm.tree.AbstractInsnNode from, org.objectweb.asm.tree.InsnList list, java.util.function.Predicate<org.objectweb.asm.tree.AbstractInsnNode> filter, java.util.function.BiConsumer<org.objectweb.asm.tree.InsnList, T> action) {
         org.objectweb.asm.tree.AbstractInsnNode node = from;
         while (node != null) {
-            if (filter.test(node))
-                action.accept(list, (T) node);
+            final org.objectweb.asm.tree.AbstractInsnNode target = node;
             node = node.getNext();
+            if (filter.test(target))
+                action.accept(list, (T) target);
         }
     }
 
     public static <T extends org.objectweb.asm.tree.AbstractInsnNode> void forEachBack(org.objectweb.asm.tree.AbstractInsnNode from, org.objectweb.asm.tree.InsnList list, java.util.function.Predicate<org.objectweb.asm.tree.AbstractInsnNode> filter, java.util.function.BiConsumer<org.objectweb.asm.tree.InsnList, T> action) {
         org.objectweb.asm.tree.AbstractInsnNode node = from;
         while (node != null) {
-            if (filter.test(node))
-                action.accept(list, (T) node);
+            final org.objectweb.asm.tree.AbstractInsnNode target = node;
             node = node.getPrevious();
+            if (filter.test(target))
+                action.accept(list, (T) target);
         }
     }
 
