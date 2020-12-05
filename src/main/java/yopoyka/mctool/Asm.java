@@ -110,19 +110,6 @@ public class Asm {
         return n -> n.getOpcode() == opcode;
     }
 
-    public static java.util.function.Predicate<org.objectweb.asm.tree.AbstractInsnNode> opcodes(int opcodes) {
-        return n -> (n.getOpcode() & opcodes) != 0;
-    }
-
-    public static java.util.function.Predicate<org.objectweb.asm.tree.AbstractInsnNode> methodCall() {
-        return opcodes(
-                org.objectweb.asm.Opcodes.INVOKEVIRTUAL
-                | org.objectweb.asm.Opcodes.INVOKEINTERFACE
-                | org.objectweb.asm.Opcodes.INVOKESPECIAL
-                | org.objectweb.asm.Opcodes.INVOKESTATIC
-        );
-    }
-
     public static java.util.function.Predicate<org.objectweb.asm.tree.AbstractInsnNode> type(String type) {
         return n -> n instanceof org.objectweb.asm.tree.TypeInsnNode && type.equals(((org.objectweb.asm.tree.TypeInsnNode) n).desc);
     }
